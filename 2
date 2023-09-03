@@ -1,0 +1,176 @@
+import random
+
+# Initialize the grid
+rows, cols = 12, 8
+grid = [[{'block_type': random.choice('abcd'), 'is_matching': False, 'checked': False} for _ in range(cols)] for _ in range(rows)]
+all_cells_checked = False
+
+# Initialize shapes
+# Os represent matching block types
+# Xs represent non-matching block types, or matching block types in cells that are not part of the shape
+#TODO remove checked if not used
+shapes = [
+    {'shape': ['OXX', 'OOO', 'OXX'], 'score': 5, 'checked': False},
+    {'shape': ['XOX', 'XOX', 'OOO'], 'score': 5, 'checked': False},
+    {'shape': ['XXO', 'OOO', 'XXO'], 'score': 5, 'checked': False},
+    {'shape': ['OOO', 'OXX', 'OXX'], 'score': 5, 'checked': False},
+    {'shape': ['OOO', 'XXO', 'XXO'], 'score': 5, 'checked': False},
+    {'shape': ['XXO', 'XXO', 'OOO'], 'score': 5, 'checked': False},
+    {'shape': ['OOO', 'XOX', 'XOX'], 'score': 5, 'checked': False},
+    {'shape': ['OXX', 'OXX', 'OOO'], 'score': 5, 'checked': False},
+    {'shape': ['XOX', 'OOO', 'XOX'], 'score': 5, 'checked': False},
+    {'shape': ['O', 'O', 'O', 'O', 'O'], 'score': 5, 'checked': False},
+    {'shape': ['OOOOO'], 'score': 5, 'checked': False},
+    {'shape': ['O', 'O', 'O', 'O'], 'score': 4, 'checked': False},
+    {'shape': ['OOOO'], 'score': 4, 'checked': False},
+    {'shape': ['OO', 'OO'], 'score': 4, 'checked': False},
+    {'shape': ['O', 'O', 'O'], 'score': 3, 'checked': False},
+    {'shape': ['OOO'], 'score': 3, 'checked': False}
+]
+
+# Sort shapes by score in descending order
+# Shapes with higher scores should always be above shapes with lower scores for
+# shape matching logic to work properly. (i.e matches of 5 should always be above
+# matches of 4, above matches of 3, etc.) This sort ensures the correct order.
+shapes = sorted(shapes, key=lambda x: x['score'], reverse=True)
+
+
+# Helper function to check for a match
+# Excludes cells that have already been used for a match when checking the grid
+# for subsequent matches before removing all matches and updating the grid
+def is_match(grid, shape, row, col):
+    global all_cells_checked
+    shape_rows, shape_cols = len(shape), len(shape[0])
+    block_type = None
+    matching_positions = []
+
+    while all_cells_checked == False:
+        for r in range(shape_rows):
+            print(r)
+            for c in range(shape_cols):
+                grid[row + r][col + c]['checked'] = True
+                if row + r == rows - 1 and row + c == cols - 1:
+                    all_cells_checked = True
+                if grid[row + r][col + c]['is_matching'] == True:
+                    continue
+                if shape[r][c] == 'O':
+                    if block_type is None:
+                        block_type = grid[row + r][col + c]['block_type']
+                    elif grid[row + r][col + c]['block_type'] != block_type:
+                        continue
+                    matching_positions.append((row + r, col + c))
+                elif shape[r][c] == 'X':
+                    if grid[row + r][col + c]['block_type'] == block_type:
+                        continue
+
+        if block_type is not None:
+            for r, c in matching_positions:
+                grid[r][c]['is_matching'] = True
+            return True, matching_positions
+        else:
+            continue
+
+# Finds first match found in grid
+# Always searches for higher scoring matches first, this ensures that matches
+# are not duplicated. For example, a 5 match will always include a 3 match and/
+# or a 4 match. By finding the 5 match first, we can exclude duplicate 3 matches
+# and/or 4 matches in subsequent searches
+def find_match(grid, shape_dict):
+    print(f"checking shape {shape_dict['shape']}")
+    shape = shape_dict['shape']
+    score = shape_dict['score']
+    rows, cols = len(grid), len(grid[0])
+    shape_rows, shape_cols = len(shape), len(shape[0])
+    
+    for row in range(rows - shape_rows + 1):
+        for col in range(cols - shape_cols + 1):
+            match, matching_positions = is_match(grid, shape, row, col)               
+            if match:
+                positions = [(r, c) for r, c in matching_positions]
+                return {'shape': shape, 'positions': positions, 'score': score}
+            else:
+                return False
+
+def find_matches_for_shape(grid, shape_dict):
+    global all_cells_checked
+    shape_matches = []
+    # continue to check for matches for shape until all cells are checked
+    while all_cells_checked is False:
+        match = find_match(grid, shape_dict)
+        if match:
+            shape_matches.append(match)
+        all_cells_checked = all_cells_checked
+    #TODO remove if not used
+    # set this shape's checked value to True to prevent this shape from being checked again
+    shape_dict['checked'] = True
+    # reset the all_cells_checked flag so that the next shape can be checked
+    all_cells_checked = False
+    return shape_matches
+
+def find_matches_for_shapes(grid):
+    matches = []
+    for shape_dict in shapes:
+        print(shape_dict)
+        matches = find_matches_for_shape(grid, shape_dict)
+        if match:
+            matches.extend(match)
+    return matches
+
+
+# Function to update the grid
+def update_grid(grid):
+    for row in range(rows):
+        for col in range(cols):
+            if grid[row][col]['is_matching'] is True:
+                grid[row][col] = None
+
+    # Let the letters above fall down
+    rows, cols = len(grid), len(grid[0])
+    for col in range(cols):
+        empty_row = rows - 1
+        for row in reversed(range(rows)):
+            if grid[row][col] is None:
+                continue
+            else:
+                grid[empty_row][col] = grid[row][col]
+                if empty_row != row:
+                    grid[row][col] = None
+                empty_row -= 1
+
+    # Fill in the empty spots at the top with new random letters
+    for row in range(rows):
+        for col in range(cols):
+            if grid[row][col] is None:
+                grid[row][col] = random.choice('ABCD')
+
+    return grid
+
+
+# Main loop
+score = 0
+while True:
+    # Print the grid for debugging
+    for row in grid:
+        print(' '.join(cell['block_type'] for cell in row))
+    print()
+
+    matches = find_matches_for_shapes(grid)
+    if matches:
+        print("Found matches:")
+        for match in matches:
+            print(f"{match}\n")
+        score += sum(len(positions) for _, positions in matches)
+        for _, positions in matches:
+            for position in positions:
+                grid[position[0]][position[1]]['block_type'] = grid[position[0]][position[1]]['block_type'].upper()
+        for row in grid:
+            print(' '.join(cell if cell else '.' for cell in row))
+        print()
+        print(f"Score: {score}")
+        # update_grid(grid, matches)
+    else:
+        print("No matches found.")
+
+    user_input = input("Press 'q' to quit or any other key to continue: ")
+    if user_input == 'q':
+        break
